@@ -1,6 +1,8 @@
 # README
 
-Welcome to this Git repository!
+Welcome to this Git repository where you can produce the base plot that turned into this: 
+![USPresidents](https://imgur.com/wEOhBtk "The U.S. Presidency")
+
 
 This repository contains an R Markdown file that you can use to analyze data or create reports. To use the R Markdown file, you need to have the following:
 
