@@ -1,0 +1,152 @@
+---
+title: "reign"
+author: "Ellie White"
+date: "2023-04-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+```{r lib}
+library(tidyverse)
+library(rvest)
+library(httr)
+library(polite)
+library(lubridate)
+library(janitor)
+library(stringr)
+library(ggimage)
+library(cropcircles)
+```
+
+# Scrape Wikipedia
+```{r scrape}
+url <- "https://en.m.wikipedia.org/wiki/List_of_presidents_of_the_United_States"
+url_bow <- polite::bow(url)
+
+usp_html <-
+  polite::scrape(url_bow) |> 
+  rvest::html_nodes("table.wikitable") |>
+  rvest::html_table(fill = TRUE)
+
+usp_tab <- 
+  usp_html[[1]] |>
+  as_tibble(.name_repair = "minimal") |>
+  clean_names()
+```
+
+# Clean Dataframe
+```{r clean}
+usp_clean <- usp_tab |>
+  mutate(
+    name = sub("\\(.*", "", name_birth_death), 
+    birth_death = unlist(str_extract_all(usp_tab$name_birth_death, "\\([^()]+\\)")), 
+    birth_death_clean = substring(birth_death, 2, nchar(birth_death)-1), 
+    death = as.Date(ifelse(substring(birth_death_clean, 1, 1)=="b", 
+                           format(as.Date(Sys.Date(), format = "%Y-%m-%d"), "%Y"), 
+                           substring(birth_death_clean, nchar(birth_death_clean)-3, nchar(birth_death_clean))), 
+                    format = "%Y"), 
+    birth = as.Date(ifelse(substring(birth_death_clean, 1, 1)!="b", 
+                           substring(birth_death_clean, 1, 4), 
+                           substring(birth_death_clean, 4, 7)), 
+                    format = "%Y"), 
+    term_start = as.Date(sapply(strsplit(term_14, split = "–"), `[`, 1), format = "%B %d, %Y"),
+    term_end = as.Date(sapply(strsplit(term_14, split = "–"), `[`, 2), format = "%B %d, %Y"), 
+    term_end = if_else(is.na(term_end), as.Date(Sys.Date(), format = "%Y-%m-%d"), term_end), # fix the current president's end of term
+    age_start_of_term = time_length(term_start - birth, "years"), 
+    age_end_of_term = time_length(term_end - birth, "years"), 
+    age_death = time_length(death - birth, "years"),
+    party = factor(party_b_15_2, levels = c("Unaffiliated", "Federalist", "Democratic-Republican", "Democratic-Republican[f]National Republican", "Democratic", "Whig", "Whig[j]Unaffiliated", "Republican\nNational Union[l]", "National Union[n]Democratic", "Republican"), labels = c("Unaffiliated", "Federalist", "Democratic-Republican", "Democratic-Republican & National Republican", "Democratic", "Whig", "Whig & Unaffiliated", "Republican & National Union", "National Union & Democratic", "Republican")), 
+    party_1 = sub("\\[.*", "", party_b_15_2),
+    party_2 = sub(".*\\]", "", party_b_15_2)
+  ) |>
+  select(-c(birth_death, birth_death_clean)) 
+
+# manually clean the one row with \n in it 
+usp_clean[16, "party_1"] <- "Republican"
+usp_clean[16, "party_2"] <- "National Union"
+
+usp_clean <- usp_clean |>
+  mutate(
+    party_1 = factor(party_1, levels = c("Unaffiliated", "Federalist", "Democratic-Republican", "National Republican", "Democratic", "Whig", "Republican", "National Union")), 
+    party_2 = factor(party_2, levels = c("Unaffiliated", "Federalist", "Democratic-Republican", "National Republican", "Democratic", "Whig", "Republican", "National Union"))
+  ) |>
+  select(-c(portrait, name_birth_death, term_14, party_b_15, election))
+
+str(usp_clean) 
+```
+
+# Add Data for Plot
+```{r add}
+# add portraits
+portraits <- paste0("1_fetch/in/", list.files("1_fetch/in"))
+
+if (!dir.exists("1_fetch/out/cropped")){
+  dir.create("1_fetch/out/cropped")
+}
+
+portraits <- circle_crop(portraits, to = paste0("1_fetch/out/cropped/", list.files("1_fetch/in")))
+portraits <- paste0("1_fetch/out/cropped/", list.files("1_fetch/out/cropped"))
+usp_clean$images_cropped <- portraits
+
+# add an explanation facet in the beginning and a blank one next to it
+usp_exp <- data.frame(no_a = -1, party_b_15_2 = "Unaffiliated", vice_president_16 = NA, name = "none", death = 75+1000, birth = 0+1000, term_start = 50+1000, term_end = 58+1000, age_start_of_term = 50, age_end_of_term = 58, age_death = 75, party = "Unaffiliated", party_1 = "Unaffiliated", party_2 = "Unaffiliated", images_cropped = NA)
+usp_clean <- rbind(NA, usp_clean) # for a blank spot
+usp_clean <- rbind(usp_exp, usp_clean)
+usp_clean[2, "no_a"] <- 0
+usp_clean$no_a <- factor(usp_clean$no_a, levels = c(as.character(min(usp_clean$no_a):max(usp_clean$no_a))))
+```
+
+# Write Table
+```{r write_out}
+# not that you need to, but if you want to see the data in excel...
+write.csv(usp_clean, "1_fetch/out/us_presidents.csv")
+```
+
+# Plot
+```{r base_plot}
+ggplot(usp_clean) +
+  geom_segment(aes(x = 0, y = 1, xend = age_death, yend = 1, color = party_1), linewidth = 1) +
+  scale_color_manual(values = c("grey60", "#EA9978", "#008000", "#F0C862", "#B22222", "#3333FF", "#E81B23", "grey30"),  
+                     breaks = c("Unaffiliated", "Federalist", "Democratic-Republican", "Whig", "National Union", "Democratic", "Republican", NA)) +
+  guides(colour = guide_legend(nrow = 1)) +
+  geom_segment(aes(x = age_start_of_term, y = 1, xend = age_end_of_term, yend = 1), color = alpha("black", 0.5), linewidth = 3) +
+  scale_y_continuous(limits = c(-1.5, 1.5)) +
+  coord_polar()+
+  geom_image(aes(x = 0, y = -1.5, image = images_cropped), size = 0.5) + 
+  facet_wrap(~no_a, nrow = 4, 
+             labeller = as_labeller(setNames(usp_clean$name, usp_clean$no_a), label_wrap_gen(10)),
+             drop = FALSE) +
+  labs(x = "", y = "", color = "", title = "The U.S. Presidency\n", subtitle = "\n") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 28),
+        plot.margin = margin(b = 40, unit = "pt"),
+        legend.position = "bottom", 
+        axis.text.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        legend.title = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.spacing.y = unit(2.5, "lines"), 
+        panel.spacing.x = unit(1.5, "lines"))
+
+ggsave("2_out/us_presidents_base.png", width = 16, height = 9, units = "in", dpi = 1200)
+```
+
+# Data Source: 
+
+Wikipedia contributors. (2023, April 23). List of presidents of the United States. In Wikipedia, The Free Encyclopedia. Retrieved 22:36, May 3, 2023, from https://en.wikipedia.org/w/index.php?title=List_of_presidents_of_the_United_States&oldid=1151381415
+
+# Process
+
+1) produced 2_out/us_presidents_base.png with this rmarkdown script and ggplot
+2) made markups in PowerPoint
+3) final plot is called 2_out/us_presidents_final.png
+
+
+
+
+
