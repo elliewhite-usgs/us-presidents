@@ -33,11 +33,15 @@ To run the R Markdown file, you will need to install the following packages:
 
 To install these packages, open RStudio and run the following commands in the console:
 
+```
+## Install the necessary packages
 install.packages("tidyverse")
 install.packages("ggplot2")
 install.packages("knitr")
 install.packages("rmarkdown")
+``` 
 
+You can customize the package list as per your requirements. Simply include this code block in your markdown file, and the packages will be installed when the code is executed.
 
 ## Usage
 
