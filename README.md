@@ -63,7 +63,9 @@ Once you have downloaded the R Markdown file, open it in RStudio by navigating t
 
 You can run the R Markdown file by clicking on the "Knit" button in RStudio, or by running the following command in the console:
 
-
+```
+rmarkdown::render()
+```
 
 ## Conclusion
 
