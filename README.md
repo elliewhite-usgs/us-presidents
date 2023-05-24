@@ -51,8 +51,9 @@ You can customize the package list as per your requirements. Simply include this
 
 You can download the R Markdown file from this Git repository by clicking on the "Download" button or by cloning the repository using the following command:
 
-git clone https://github.com/whiteellie/us_presidents.git
-
+```
+git clone https://github.com/whiteellie/us-presidents.git
+```
 
 ### 2. Open the R Markdown file in RStudio
 

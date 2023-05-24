@@ -133,7 +133,7 @@ ggplot(usp_clean) +
         panel.spacing.y = unit(2.5, "lines"), 
         panel.spacing.x = unit(1.5, "lines"))
 
-ggsave("2_out/us_presidents_base.png", width = 16, height = 9, units = "in", dpi = 1200)
+ggsave("2_out/us_presidents_base.png", width = 16, height = 9, units = "in", dpi = 900)
 ```
 
 # Data Source: 
